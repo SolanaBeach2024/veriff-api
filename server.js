@@ -10,7 +10,7 @@ app.use(express.json());
 app.use(cors());
 
 app.get("/", (req, res) => {
-  res.send("✅ Veriff API Live and running (StationAPI version)");
+  res.send("✅ Veriff API Live and running (Multi-document mode active)");
 });
 
 app.post("/api/create-session", async (req, res) => {
@@ -29,8 +29,7 @@ app.post("/api/create-session", async (req, res) => {
             firstName: "Client",
             lastName: "Onboarding",
           },
-          // AUTO lets user pick Passport / ID / License
-          document: { type: "AUTO" },
+          // document type omitted => Veriff shows all available types
           timestamp: new Date().toISOString(),
           redirect: `${process.env.FRONTEND_URL}?kyc=done`,
         },
