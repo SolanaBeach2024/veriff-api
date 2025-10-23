@@ -1,23 +1,23 @@
 import express from "express";
 import fetch from "node-fetch";
-import dotenv from "dotenv";
 import cors from "cors";
+import dotenv from "dotenv";
 
 dotenv.config();
+
 const app = express();
-
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 
-// 🟢 Root health check
+// Root test route
 app.get("/", (req, res) => {
   res.send("✅ Veriff API Live and running");
 });
 
-// 🟣 Create Veriff session
+// Create Veriff session
 app.post("/api/create-session", async (req, res) => {
   try {
-    const response = await fetch("https://stationapi.veriff.com/v1/sessions", {
+    const response = await fetch("https://api.veriff.com/v1/sessions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -31,9 +31,6 @@ app.post("/api/create-session", async (req, res) => {
             lastName: "Onboarding",
           },
           vendorData: "0x.agency-client",
-          document: {
-            type: "PASSPORT", // required by Station API
-          },
           timestamp: new Date().toISOString(),
         },
       }),
@@ -41,31 +38,36 @@ app.post("/api/create-session", async (req, res) => {
 
     const data = await response.json();
 
-    // 🧠 Debug logs for Render console
-    console.log("📨 Veriff API Response:", JSON.stringify(data, null, 2));
-
-    if (!response.ok || !data.verification?.id) {
-      console.error("❌ Veriff session creation failed:", data);
-      return res.status(500).json({ error: "Veriff API error", details: data });
+    if (response.ok && data.verification?.url) {
+      console.log("✅ Veriff session created successfully:", data.verification.id);
+      res.json({ status: "success", verification: data.verification });
+    } else {
+      console.error("❌ Veriff API error:", data);
+      res.status(400).json({
+        error: "Veriff API error",
+        details: data,
+      });
     }
-
-    console.log("✅ Veriff Session Created:", data.verification.id);
-    res.json({ status: "success", verification: data.verification });
   } catch (error) {
     console.error("⚠️ Veriff Session Error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Internal server error", details: error.message });
   }
 });
 
-// 🔵 Veriff callback route
+// Handle Veriff callback
 app.post("/callback", async (req, res) => {
-  console.log("📥 Received callback from Veriff:", JSON.stringify(req.body, null, 2));
-  res.status(200).json({ message: "Callback received" });
+  console.log("📩 Veriff callback received:", req.body);
+  res.status(200).send("Callback received");
 });
 
-// 🟢 Start server
+// Redirect route for successful verification
+app.get("/callback", (req, res) => {
+  console.log("🔁 User redirected from Veriff");
+  res.redirect(`${process.env.FRONTEND_URL}?kyc=done`);
+});
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌍 Your service is live at: ${process.env.BASE_URL}`);
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`🌐 Your service is live → ${process.env.BASE_URL}`);
 });
