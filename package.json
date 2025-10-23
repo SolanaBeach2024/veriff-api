@@ -1,0 +1,10 @@
+{
+  "name": "veriff-api",
+  "version": "1.0.0",
+  "description": "Serverless Veriff session creator for 0x Agency onboarding",
+  "main": "api/create-session.js",
+  "type": "module",
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}
