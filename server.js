@@ -13,7 +13,7 @@ const VERIFF_API_KEY = process.env.VERIFF_API_KEY;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://0x.agency/onboarding.html";
 
-console.log("✅ Veriff API Service Starting...");
+console.log("✅ Veriff Station API Starting...");
 console.log("Base URL:", BASE_URL);
 console.log("Frontend URL:", FRONTEND_URL);
 console.log("Port:", PORT);
@@ -23,57 +23,51 @@ app.post("/api/create-session", async (req, res) => {
   console.log("➡️ KYC Session Request Received...");
 
   const payload = {
-    vendorData: "0xAgency",
     verification: {
-      callback: `${BASE_URL}/callback`
+      callback: `${BASE_URL}/callback`,
+      vendorData: "0xAgency"
     }
   };
 
-  // Try global first, then EU fallback
-  const endpoints = [
-    "https://api.veriff.com/v1/sessions",
-    "https://api.eu.veriff.com/v1/sessions",
-    "https://sandbox.veriff.me/v1/sessions"
-  ];
+  try {
+    const response = await fetch("https://stationapi.veriff.com/v1/sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-AUTH-CLIENT": VERIFF_API_KEY
+      },
+      body: JSON.stringify(payload)
+    });
 
-  for (const endpoint of endpoints) {
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-AUTH-CLIENT": VERIFF_API_KEY
-        },
-        body: JSON.stringify(payload)
+    const data = await response.json();
+
+    if (response.ok && data.verification?.url) {
+      console.log("✅ Veriff Station session created successfully");
+      return res.json({ status: "success", verification: data.verification });
+    } else {
+      console.error("⚠️ Veriff Station API response error:", data);
+      return res.status(500).json({
+        status: "error",
+        message: data.message || "Unexpected response from Veriff Station API"
       });
-
-      const data = await response.json();
-
-      if (response.ok && data.verification?.url) {
-        console.log(`✅ Veriff session created successfully via ${endpoint}`);
-        return res.json({ status: "success", verification: data.verification });
-      } else {
-        console.warn(`⚠️ Veriff response not OK from ${endpoint}:`, data);
-      }
-    } catch (err) {
-      console.error(`❌ Veriff Session Error via ${endpoint}:`, err.message);
     }
+  } catch (err) {
+    console.error("❌ Veriff Station API request failed:", err.message);
+    return res.status(500).json({
+      status: "error",
+      message: "Error connecting to Veriff Station API"
+    });
   }
-
-  res.status(500).json({
-    status: "error",
-    message: "Failed to create Veriff session. Check logs for details."
-  });
 });
 
 // ---------- HEALTH CHECK ----------
 app.get("/", (req, res) => {
-  res.send("✅ Veriff API Live and Running");
+  res.send("✅ Veriff Station API Live and Running");
 });
 
-// ---------- CALLBACK ENDPOINT (Optional) ----------
-app.post("/callback", async (req, res) => {
-  console.log("📩 Veriff Callback Received:", req.body);
+// ---------- CALLBACK ENDPOINT ----------
+app.post("/callback", (req, res) => {
+  console.log("📩 Callback from Veriff Station:", req.body);
   res.sendStatus(200);
 });
 
