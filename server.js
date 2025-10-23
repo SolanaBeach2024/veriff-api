@@ -2,78 +2,111 @@ import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
 import dotenv from "dotenv";
+import bodyParser from "body-parser";
 
 dotenv.config();
 const app = express();
-app.use(express.json());
-app.use(cors());
-
 const PORT = process.env.PORT || 10000;
-const VERIFF_API_KEY = process.env.VERIFF_API_KEY;
-const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
-const FRONTEND_URL = process.env.FRONTEND_URL || "https://0x.agency/onboarding.html";
 
-console.log("✅ Veriff Station API Starting...");
-console.log("Base URL:", BASE_URL);
-console.log("Frontend URL:", FRONTEND_URL);
-console.log("Port:", PORT);
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// ---------- CREATE SESSION ----------
+// Root check
+app.get("/", (req, res) => {
+  res.send("✅ Veriff API Live and running");
+});
+
+// -----------------------------------------
+// 🔹 CREATE VERIFF SESSION
+// -----------------------------------------
 app.post("/api/create-session", async (req, res) => {
-  console.log("➡️ KYC Session Request Received...");
-
-  const payload = {
-    verification: {
-      callback: `${BASE_URL}/callback`,
-      vendorData: "0xAgency"
-    }
-  };
-
   try {
     const response = await fetch("https://stationapi.veriff.com/v1/sessions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-AUTH-CLIENT": VERIFF_API_KEY
+        "X-AUTH-CLIENT": process.env.VERIFF_API_KEY,
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        verification: {
+          callback: `${process.env.BASE_URL}/callback`,
+          person: { givenName: "Client" },
+          vendorData: "0x.agency-client",
+          timestamp: new Date().toISOString(),
+        },
+      }),
     });
 
     const data = await response.json();
 
-    if (response.ok && data.verification?.url) {
-      console.log("✅ Veriff Station session created successfully");
-      return res.json({ status: "success", verification: data.verification });
-    } else {
-      console.error("⚠️ Veriff Station API response error:", data);
-      return res.status(500).json({
-        status: "error",
-        message: data.message || "Unexpected response from Veriff Station API"
-      });
+    if (!response.ok) {
+      console.error("❌ Veriff session creation failed:", data);
+      return res.status(500).json({ error: "Veriff API error", details: data });
     }
-  } catch (err) {
-    console.error("❌ Veriff Station API request failed:", err.message);
-    return res.status(500).json({
-      status: "error",
-      message: "Error connecting to Veriff Station API"
-    });
+
+    console.log("✅ Veriff Session Created:", data.verification.id);
+    res.json({ status: "success", verification: data.verification });
+  } catch (error) {
+    console.error("⚠️ Veriff Session Error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ---------- HEALTH CHECK ----------
-app.get("/", (req, res) => {
-  res.send("✅ Veriff Station API Live and Running");
+// -----------------------------------------
+// 🔹 CHECK KYC STATUS
+// -----------------------------------------
+app.get("/api/status/:id", async (req, res) => {
+  const id = req.params.id;
+
+  try {
+    const response = await fetch(`https://stationapi.veriff.com/v1/sessions/${id}`, {
+      headers: { "X-AUTH-CLIENT": process.env.VERIFF_API_KEY },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ Veriff Status Fetch Failed:", data);
+      return res.status(500).json({ error: "Veriff status check failed", details: data });
+    }
+
+    const status = data.verification?.status || "pending";
+    console.log(`📡 Status for ${id}: ${status}`);
+    res.json({ status });
+  } catch (error) {
+    console.error("⚠️ Status check error:", error);
+    res.status(500).json({ status: "error" });
+  }
 });
 
-// ---------- CALLBACK ENDPOINT ----------
-app.post("/callback", (req, res) => {
+// -----------------------------------------
+// 🔹 CALLBACK HANDLER (Veriff POST callback)
+// -----------------------------------------
+app.post("/callback", express.json(), (req, res) => {
   console.log("📩 Callback from Veriff Station:", req.body);
+
+  const verification = req.body?.verification || {};
+  const status = verification.status || req.body.status || "unknown";
+
+  console.log(`🧾 Callback Status: ${status} | ID: ${verification.id || "N/A"}`);
+
+  // ✅ Log successful verification
+  if (status === "approved") {
+    console.log("✅ KYC Approved for:", verification.id);
+  } else {
+    console.log("ℹ️ KYC Update:", status);
+  }
+
   res.sendStatus(200);
 });
 
-// ---------- START SERVER ----------
+// -----------------------------------------
+// 🔹 START SERVER
+// -----------------------------------------
 app.listen(PORT, () => {
-  console.log("✅ Server running on port", PORT);
-  console.log("🌍 Your service is live at:", BASE_URL);
-  console.log("//////////////////////////////////////////////////////");
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌍 Base URL: ${process.env.BASE_URL}`);
+  console.log(`✅ Your service is live`);
 });
