@@ -10,12 +10,12 @@ app.use(express.json());
 app.use(cors());
 
 app.get("/", (req, res) => {
-  res.send("✅ Veriff API Live and running");
+  res.send("✅ Veriff API Live and running (StationAPI version)");
 });
 
 app.post("/api/create-session", async (req, res) => {
   try {
-    const response = await fetch("https://api.veriff.com/v1/sessions", {
+    const response = await fetch("https://stationapi.veriff.com/v1/sessions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -23,12 +23,15 @@ app.post("/api/create-session", async (req, res) => {
       },
       body: JSON.stringify({
         verification: {
+          callback: `${process.env.BASE_URL}/callback`,
+          vendorData: "0x.agency-client",
           person: {
             firstName: "Client",
             lastName: "Onboarding",
           },
-          vendorData: "0x.agency-client",
-          callback: `${process.env.BASE_URL}/callback`,
+          // AUTO lets user pick Passport / ID / License
+          document: { type: "AUTO" },
+          timestamp: new Date().toISOString(),
           redirect: `${process.env.FRONTEND_URL}?kyc=done`,
         },
       }),
@@ -55,6 +58,7 @@ app.post("/callback", (req, res) => {
 });
 
 app.get("/callback", (req, res) => {
+  console.log("🔁 Redirecting to onboarding success page");
   res.redirect(`${process.env.FRONTEND_URL}?kyc=done`);
 });
 
