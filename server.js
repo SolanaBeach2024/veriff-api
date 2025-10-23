@@ -10,7 +10,7 @@ app.use(express.json());
 app.use(cors());
 
 app.get("/", (req, res) => {
-  res.send("✅ Veriff API Live and running (Multi-document mode active)");
+  res.send("✅ Veriff API Live and running (Fixed parameter structure)");
 });
 
 app.post("/api/create-session", async (req, res) => {
@@ -23,15 +23,15 @@ app.post("/api/create-session", async (req, res) => {
       },
       body: JSON.stringify({
         verification: {
-          callback: `${process.env.BASE_URL}/callback`,
           vendorData: "0x.agency-client",
           person: {
             firstName: "Client",
             lastName: "Onboarding",
           },
-          // document type omitted => Veriff shows all available types
-          timestamp: new Date().toISOString(),
-          redirect: `${process.env.FRONTEND_URL}?kyc=done`,
+          // ✅ Keep callback here, it's required
+          callback: `${process.env.BASE_URL}/callback`,
+          // ❌ remove redirect/timestamp (not supported anymore)
+          // Veriff will handle returning automatically
         },
       }),
     });
